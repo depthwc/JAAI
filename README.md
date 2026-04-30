@@ -1,6 +1,6 @@
 # JAAI — O'zbekiston Jinoyatchilik Tahlili AI
 
-O'zbekiston Respublikasi bo'yicha 2021–2025 yillar jinoyatchilik statistikasini tahlil qiluvchi va 2026-yilga LLM yordamida bashorat beruvchi premium veb-dashboard. Foydalanuvchi UI orqali hudud va jinoyat turini filtrlash, tarixiy dinamikani ko'rish va Jarvis-uslubidagi AI yordamchi bilan o'zbek tilida suhbatlashish imkoniga ega.
+O'zbekiston Respublikasi bo'yicha 2021–2025 yillar jinoyatchilik statistikasini tahlil qiluvchi va 2026-yilga LLM yordamida bashorat beruvchi premium veb-dashboard. Foydalanuvchi UI orqali hudud va jinoyat turini filtrlash, tarixiy dinamikani ko'rish va AI yordamchi bilan o'zbek tilida suhbatlashish imkoniga ega.
 
 ## Loyiha tuzilishi
 

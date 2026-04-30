@@ -190,49 +190,111 @@ async def chat(request: Request):
             sel_region = ui_context.get('region') if ui_context.get('region') and ui_context.get('region') != 'All' else None
             sel_crime = ui_context.get('crime_type') if ui_context.get('crime_type') and ui_context.get('crime_type') != 'All' else None
 
+            rows = cur.execute("""
+                SELECT Hudud_lotin, Jinoyat_turi, Yil, Jinoyatlar_soni
+                FROM jinoyatlar_statistikasi
+                ORDER BY Hudud_lotin, Jinoyat_turi, Yil
+            """).fetchall()
+            conn.close()
+
+            from collections import defaultdict
+            by_rc = defaultdict(dict)            # {(region, crime): {year: count}}
+            by_region_year = defaultdict(int)    # {(region, year): total}
+            by_crime_year = defaultdict(int)     # {(crime, year): total}
+            by_year = defaultdict(int)           # {year: total}
+            regions, crimes, years = set(), set(), set()
+            for region, crime, year, count in rows:
+                by_rc[(region, crime)][year] = count
+                regions.add(region)
+                crimes.add(crime)
+                years.add(year)
+                # "O'zbekiston Respublikasi" allaqachon agregat — ikki marta qo'shmaymiz
+                if region != "O'zbekiston Respublikasi":
+                    by_region_year[(region, year)] += count
+                    by_crime_year[(crime, year)] += count
+                    by_year[year] += count
+
+            years_sorted = sorted(years)
+            regions_sorted = sorted(regions)
+            crimes_sorted = sorted(crimes)
+
             parts = []
 
-            top5 = cur.execute("""
-                SELECT Hudud_lotin, Jami_2025, Reyting FROM region_rankings_2025 LIMIT 5
-            """).fetchall()
-            parts.append("2025-yilda eng ko'p jinoyat sodir bo'lgan 5 ta hudud (jami, barcha turlar):")
-            for r, n, rk in top5:
-                parts.append(f"  {rk}. {r}: {n} ta")
+            # 1) To'liq xom statistika — har bir hudud × jinoyat turi × yil
+            parts.append("==== TO'LIQ XOM STATISTIKA (har bir hudud / jinoyat turi / yil) ====")
+            parts.append("Format: Hudud | Jinoyat turi | " + " | ".join(years_sorted))
+            for region in regions_sorted:
+                for crime in crimes_sorted:
+                    yc = by_rc.get((region, crime), {})
+                    if not yc:
+                        continue
+                    vals = " | ".join(str(yc.get(y, '-')) for y in years_sorted)
+                    parts.append(f"{region} | {crime} | {vals}")
 
+            # 2) Mamlakat bo'ylab yillik jami (O'zR agregati chiqarilmagan)
+            parts.append("\n==== MAMLAKAT BO'YICHA YILLIK JAMI (viloyatlar yig'indisi) ====")
+            for y in years_sorted:
+                parts.append(f"  {y}: {by_year[y]} ta")
 
-            growth = cur.execute("SELECT Jinoyat_turi, Y2021, Y2025, Osish_foizi FROM crime_type_growth ORDER BY Osish_foizi DESC").fetchall()
-            parts.append("\nJinoyat turlari bo'yicha 2021-2025 yillik o'sish:")
-            for ct, y21, y25, gr in growth:
-                parts.append(f"  - {ct}: 2021-y. {y21} -> 2025-y. {y25} ({gr:+.1f}%)")
+            # 3) Hudud reytingi — har bir yil bo'yicha
+            parts.append("\n==== HUDUDLAR REYTINGI (jami jinoyatlar, barcha turlar) ====")
+            for y in years_sorted:
+                ranked = sorted(
+                    [(r, by_region_year[(r, y)]) for r in regions_sorted if r != "O'zbekiston Respublikasi"],
+                    key=lambda x: x[1], reverse=True
+                )
+                parts.append(f"  {y}-yil:")
+                for i, (r, n) in enumerate(ranked, 1):
+                    parts.append(f"    {i}. {r}: {n} ta")
 
-            yearly = cur.execute("""
-                SELECT Yil, SUM(Jami_jinoyatlar) FROM region_yearly_totals GROUP BY Yil ORDER BY Yil
-            """).fetchall()
-            parts.append("\nMamlakat bo'ylab yillik umumiy jinoyatlar (TOTAL):")
-            for y, n in yearly:
-                parts.append(f"  - {y}: {n} ta")
+            # 4) Jinoyat turlari bo'yicha yillik dinamika va 2021->2025 o'sishi
+            parts.append("\n==== JINOYAT TURLARI BO'YICHA YILLIK DINAMIKA (mamlakat bo'yicha) ====")
+            for crime in crimes_sorted:
+                yearly_vals = [(y, by_crime_year[(crime, y)]) for y in years_sorted]
+                line = f"  {crime}: " + ", ".join(f"{y}={n}" for y, n in yearly_vals)
+                if len(years_sorted) >= 2:
+                    first = by_crime_year[(crime, years_sorted[0])]
+                    last = by_crime_year[(crime, years_sorted[-1])]
+                    if first > 0:
+                        growth = (last - first) / first * 100
+                        line += f"  ({years_sorted[0]}->{years_sorted[-1]}: {growth:+.1f}%)"
+                parts.append(line)
 
-            if sel_region:
-                rows = cur.execute("""
-                    SELECT Yil, Jami_jinoyatlar FROM region_yearly_totals
-                    WHERE Hudud_lotin = ? ORDER BY Yil
-                """, (sel_region,)).fetchall()
-                if rows:
-                    parts.append(f"\n'{sel_region}' bo'yicha yillik dinamika:")
-                    for y, n in rows:
-                        parts.append(f"  - {y}: {n} ta")
+            # 5) 2026 bashoratlari — to'liq ro'yxat
+            try:
+                with open(config.PREDICTIONS_PATH_STR, 'r', encoding='utf-8') as f:
+                    preds = json.load(f).get('predictions', [])
+                if preds:
+                    parts.append("\n==== 2026-YIL UCHUN BASHORATLAR (har bir hudud × jinoyat turi) ====")
+                    parts.append("Format: Hudud | Jinoyat turi | Kutilgan | Trend | Asoslash")
+                    for p in preds:
+                        parts.append(
+                            f"{p.get('region','')} | {p.get('crime_type','')} | "
+                            f"{p.get('expected_count_2026','')} | {p.get('probability_trend','')} | "
+                            f"{p.get('reasoning','')}"
+                        )
+            except Exception as e:
+                print("Predictions load error:", e)
 
-                if sel_crime:
-                    rows = cur.execute("""
-                        SELECT Yil, Jinoyatlar_soni FROM jinoyatlar_statistikasi
-                        WHERE Hudud_lotin = ? AND Jinoyat_turi = ? ORDER BY Yil
-                    """, (sel_region, sel_crime)).fetchall()
-                    if rows:
-                        parts.append(f"\n'{sel_region}' / '{sel_crime}' yillik dinamikasi:")
-                        for y, n in rows:
-                            parts.append(f"  - {y}: {n} ta")
+            # 6) UI tanlovi bo'yicha qisqa fokus blok
+            if sel_region or sel_crime:
+                parts.append("\n==== JORIY UI TANLOVI BO'YICHA FOKUS ====")
+                if sel_region and sel_crime:
+                    yc = by_rc.get((sel_region, sel_crime), {})
+                    if yc:
+                        parts.append(f"'{sel_region}' / '{sel_crime}' yillik dinamikasi:")
+                        for y in years_sorted:
+                            if y in yc:
+                                parts.append(f"  {y}: {yc[y]} ta")
+                elif sel_region:
+                    parts.append(f"'{sel_region}' bo'yicha yillik jami:")
+                    for y in years_sorted:
+                        parts.append(f"  {y}: {by_region_year[(sel_region, y)]} ta")
+                elif sel_crime:
+                    parts.append(f"'{sel_crime}' bo'yicha mamlakat yillik jami:")
+                    for y in years_sorted:
+                        parts.append(f"  {y}: {by_crime_year[(sel_crime, y)]} ta")
 
-            conn.close()
             return "\n".join(parts)
         except Exception as e:
             print("DB context error:", e)
