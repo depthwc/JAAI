@@ -152,8 +152,25 @@ body {
 .cs-value {
     flex: 1;
     overflow: hidden;
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+}
+
+.cs-value-text,
+.cs-option-text {
+    overflow: hidden;
     text-overflow: ellipsis;
     white-space: nowrap;
+}
+
+.cs-dot {
+    width: 11px;
+    height: 11px;
+    border-radius: 50%;
+    flex-shrink: 0;
+    box-shadow: 0 0 0 1px rgba(255, 255, 255, 0.18),
+                0 0 8px rgba(0, 0, 0, 0.45);
 }
 
 .cs-arrow {
@@ -204,6 +221,9 @@ body {
     font-size: 0.88rem;
     transition: background 0.12s ease, color 0.12s ease;
     user-select: none;
+    display: flex;
+    align-items: center;
+    gap: 0.55rem;
 }
 
 .cs-option:hover {
@@ -276,24 +296,26 @@ body {
 }
 
 .panel-header {
-    padding: 1.5rem;
+    padding: 0.55rem 1.25rem 0.5rem;
     border-bottom: 1px solid var(--border-soft);
 }
 
 .panel-header h2 {
-    font-size: 1.15rem;
+    font-size: 0.85rem;
     font-weight: 500;
-    margin-bottom: 0.3rem;
+    margin-bottom: 0.15rem;
     color: var(--text-primary);
+    letter-spacing: 0.3px;
 }
 
 .panel-header p {
     color: var(--text-secondary);
-    font-size: 0.88rem;
+    font-size: 0.72rem;
 }
 
 .table-container {
-    flex: 1;
+    flex: 1 1 0;
+    min-height: 180px;
     overflow-y: auto;
 }
 
@@ -711,4 +733,256 @@ tbody tr:hover {
     cursor: not-allowed;
     transform: none;
     box-shadow: none;
+}
+
+/* ======================================================== */
+/* ============== UZBEKISTAN MAP ========================== */
+/* ======================================================== */
+.map-section {
+    flex: 1.15 1 0;             /* a touch more room for the table */
+    min-height: 260px;
+    border-bottom: 1px solid var(--border-soft);
+    padding: 0.35rem 1rem 0.5rem;
+    display: flex;
+    flex-direction: column;
+    gap: 0.3rem;
+    background:
+        radial-gradient(circle at 70% 50%, rgba(77, 208, 225, 0.05), transparent 60%),
+        linear-gradient(180deg, rgba(22, 36, 44, 0.18) 0%, transparent 100%);
+}
+
+.map-section-header {
+    display: flex;
+    align-items: baseline;
+    gap: 0.5rem;
+    flex-wrap: wrap;
+    line-height: 1.1;
+}
+
+.map-title-text {
+    font-size: 0.78rem;
+    font-weight: 600;
+    color: var(--text-primary);
+    letter-spacing: 0.3px;
+}
+
+.map-subtitle {
+    font-size: 0.66rem;
+    color: var(--text-secondary);
+    letter-spacing: 0.3px;
+}
+
+.map-canvas-wrap {
+    width: 100%;
+    flex: 1 1 auto;
+    min-height: 280px;
+    position: relative;
+    overflow: hidden;
+    border-radius: 10px;
+    border: 1px solid var(--border-soft);
+    background:
+        linear-gradient(160deg, rgba(22, 36, 44, 0.45) 0%, rgba(22, 36, 44, 0.15) 100%);
+}
+
+#uzMap {
+    width: 100%;
+    height: 100%;
+    display: block;
+    cursor: grab;
+    touch-action: none;          /* prevent the browser's gesture from fighting our pan */
+}
+
+#uzMap.panning { cursor: grabbing; }
+
+/* Floating zoom controls in the corner of the canvas */
+.map-controls {
+    position: absolute;
+    top: 8px;
+    right: 8px;
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+    z-index: 5;
+}
+
+.map-controls button {
+    width: 30px;
+    height: 30px;
+    border-radius: 8px;
+    background: rgba(22, 36, 44, 0.78);
+    color: var(--text-primary);
+    border: 1px solid var(--border-mid);
+    cursor: pointer;
+    font-size: 16px;
+    font-weight: 600;
+    line-height: 1;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    transition: all 0.18s ease;
+    backdrop-filter: blur(6px);
+    -webkit-backdrop-filter: blur(6px);
+    user-select: none;
+    padding: 0;
+}
+
+.map-controls button:hover {
+    border-color: var(--accent);
+    color: var(--accent-bright);
+    background: rgba(22, 36, 44, 0.92);
+    box-shadow: 0 0 0 2px var(--accent-glow-soft);
+}
+
+.map-controls button:active {
+    transform: translateY(1px);
+}
+
+/* Country silhouette (background fill behind region polygons) */
+.uz-country-bg {
+    fill: rgba(77, 208, 225, 0.05);
+    stroke: none;
+    pointer-events: none;
+}
+
+/* Country silhouette (foreground border, drawn on top of regions) */
+.uz-country-border {
+    fill: none;
+    stroke: var(--accent);
+    stroke-width: 1.2;
+    stroke-linejoin: round;
+    stroke-linecap: round;
+    pointer-events: none;
+    filter: drop-shadow(0 0 6px rgba(77, 208, 225, 0.22));
+    /* Keep stroke a constant ~1.2 device-pixels wide regardless of zoom. */
+    vector-effect: non-scaling-stroke;
+}
+
+/* Per-viloyat polygons (carry hover/click) */
+.uz-region {
+    fill: rgba(77, 208, 225, 0.05);
+    stroke: rgba(125, 160, 175, 0.32);
+    stroke-width: 0.6;
+    cursor: pointer;
+    vector-effect: non-scaling-stroke;
+    transition: fill 0.3s ease, stroke 0.25s ease, opacity 0.25s ease, stroke-width 0.25s ease;
+}
+
+.uz-region:hover {
+    stroke: var(--accent-bright);
+    stroke-width: 1.2;
+    filter: brightness(1.25);
+}
+
+.uz-region.selected {
+    stroke: var(--accent-bright);
+    stroke-width: 1.6;
+    filter: drop-shadow(0 0 5px var(--accent-glow));
+}
+
+.uz-region.dimmed {
+    opacity: 0.32;
+}
+
+/* Selected-region halo (drawn just outside the marker) */
+.uz-select-halo {
+    fill: none;
+    stroke: var(--accent-bright);
+    stroke-width: 1.6;
+    stroke-dasharray: 4 3;
+    pointer-events: none;
+    animation: uz-halo-spin 8s linear infinite;
+    transform-box: fill-box;
+    transform-origin: center;
+    filter: drop-shadow(0 0 4px var(--accent-glow));
+}
+
+@keyframes uz-halo-spin {
+    from { transform: rotate(0deg); }
+    to   { transform: rotate(360deg); }
+}
+
+/* Region name labels */
+.uz-label {
+    fill: var(--text-secondary);
+    font-size: 9px;
+    font-weight: 500;
+    letter-spacing: 0.3px;
+    pointer-events: none;
+    text-shadow: 0 1px 3px rgba(0, 0, 0, 0.6);
+    transition: opacity 0.25s ease, fill 0.25s ease;
+}
+
+.uz-label.dimmed { opacity: 0.3; }
+
+.uz-label.selected {
+    fill: var(--accent-bright);
+    font-weight: 600;
+}
+
+/* Markers (circles + pie slices) */
+.uz-marker {
+    cursor: pointer;
+    transition: opacity 0.3s ease, r 0.45s cubic-bezier(0.22, 1, 0.36, 1),
+                cx 0.45s cubic-bezier(0.22, 1, 0.36, 1),
+                cy 0.45s cubic-bezier(0.22, 1, 0.36, 1),
+                fill 0.3s ease, transform 0.25s ease;
+    transform-box: fill-box;
+    transform-origin: center;
+    animation: uz-marker-in 0.45s cubic-bezier(0.22, 1, 0.36, 1) backwards;
+}
+
+.uz-marker:hover {
+    transform: scale(1.08);
+    filter: brightness(1.18);
+}
+
+.uz-marker.dimmed { opacity: 0.18; pointer-events: none; }
+
+.uz-marker-ring {
+    fill: none;
+    stroke: rgba(255, 255, 255, 0.55);
+    stroke-width: 1;
+    pointer-events: none;
+    transition: opacity 0.3s ease, r 0.45s cubic-bezier(0.22, 1, 0.36, 1);
+}
+
+.uz-marker-ring.dimmed { opacity: 0.18; }
+
+.uz-pulse {
+    fill: none;
+    stroke: var(--accent-bright);
+    stroke-width: 1.5;
+    pointer-events: none;
+    transform-box: fill-box;
+    transform-origin: center;
+    animation: uz-pulse 1.8s ease-out infinite;
+}
+
+@keyframes uz-pulse {
+    0%   { opacity: 0.7; transform: scale(0.8); }
+    100% { opacity: 0;   transform: scale(2.0); }
+}
+
+@keyframes uz-marker-in {
+    from { opacity: 0; transform: scale(0.5); }
+    to   { opacity: 1; transform: scale(1); }
+}
+
+.uz-count {
+    fill: #ffffff;
+    font-size: 11px;
+    font-weight: 700;
+    text-shadow: 0 1px 3px rgba(0, 0, 0, 0.85);
+    pointer-events: none;
+    transition: opacity 0.25s ease;
+}
+
+.uz-count.dimmed  { opacity: 0.25; }
+.uz-count.small   { font-size: 9px; }
+.uz-count.large   { font-size: 15px; }
+.uz-count.xlarge  { font-size: 19px; }
+
+/* When the map gets very narrow on small screens */
+@media (max-width: 1100px) {
+    .map-canvas-wrap { min-height: 220px; }
 }

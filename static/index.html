@@ -43,6 +43,47 @@
                     <h2>Tarixiy ma'lumotlar va 2026-yil Prognozi</h2>
                     <p id="tableSummary">Malumotlar yuklanmoqda...</p>
                 </div>
+
+                <!-- INTERACTIVE UZBEKISTAN MAP -->
+                <div class="map-section">
+                    <div class="map-section-header">
+                        <span class="map-title-text" id="mapTitleText">O'zbekiston · 2026 prognozi</span>
+                        <span class="map-subtitle" id="mapSubtitle">barcha turlar</span>
+                    </div>
+                    <div class="map-canvas-wrap">
+                        <svg id="uzMap" viewBox="0 0 1000 580" preserveAspectRatio="xMidYMid meet" aria-label="O'zbekiston xaritasi">
+                            <defs>
+                                <radialGradient id="mapBg" cx="50%" cy="50%" r="70%">
+                                    <stop offset="0%" stop-color="rgba(77, 208, 225, 0.06)"/>
+                                    <stop offset="100%" stop-color="rgba(77, 208, 225, 0)"/>
+                                </radialGradient>
+                                <filter id="markerGlow" x="-60%" y="-60%" width="220%" height="220%">
+                                    <feGaussianBlur stdDeviation="3.5" result="blur"/>
+                                    <feMerge>
+                                        <feMergeNode in="blur"/>
+                                        <feMergeNode in="SourceGraphic"/>
+                                    </feMerge>
+                                </filter>
+                            </defs>
+                            <rect x="0" y="0" width="1000" height="580" fill="url(#mapBg)"/>
+                            <!-- The geo content (regions + labels) is wrapped in a single
+                                 transform group so we can pan + zoom it. Markers live
+                                 outside this group and are repositioned manually so
+                                 they don't grow when the map zooms in. -->
+                            <g id="uz-zoom-target">
+                                <g id="uz-regions"></g>
+                                <g id="uz-labels"></g>
+                            </g>
+                            <g id="uz-markers"></g>
+                        </svg>
+                        <div class="map-controls">
+                            <button id="mapZoomIn"  type="button" title="Yaqinlashtirish" aria-label="Yaqinlashtirish">+</button>
+                            <button id="mapZoomOut" type="button" title="Uzoqlashtirish"  aria-label="Uzoqlashtirish">−</button>
+                            <button id="mapReset"   type="button" title="Qayta sozlash"   aria-label="Qayta sozlash">⟲</button>
+                        </div>
+                    </div>
+                </div>
+
                 <div class="table-container">
                     <table id="dataTable">
                         <thead>

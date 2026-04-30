@@ -154,7 +154,7 @@ def load_api_key() -> str | None:
     return None
 
 
-# String yo'llar -ba'zi kutubxonalar Path obyektini qabul qilmaydi
+
 DB_PATH_STR = str(DB_PATH)
 CLEAN_DIR_STR = str(CLEAN_DIR)
 STATIC_DIR_STR = str(STATIC_DIR)

@@ -1,1 +1,42 @@
+# Secrets
 .env
+.env.*
+!.env.example
+
+# Python
+__pycache__/
+*.py[cod]
+*.pyo
+*.pyd
+*.egg-info/
+.venv/
+venv/
+env/
+
+# Runtime-generated data (created by app.py / pipeline.py on first run)
+crime_data.db
+predictions_2026.json
+predictions_2026.json.backup
+
+# Editor / IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Local Claude Code session state
+.claude/
+
+# Map-extraction working artefacts (rebuild with the helper script if needed)
+_extract_map.py
+_extracted_map.json
+_map_paths.js
+_preview.html
+_preview.svg
+_preview.png
+uz_map_ref.png
+*.avif
