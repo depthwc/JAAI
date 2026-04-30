@@ -33,7 +33,6 @@ async def monitor_clean_data():
                 changed = False
                 files = [f for f in os.listdir(CLEAN_DIR) if f.endswith('.xlsx')]
                 
-                # Check for new or modified files
                 for f in files:
                     filepath = os.path.join(CLEAN_DIR, f)
                     mtime = os.path.getmtime(filepath)
@@ -198,17 +197,16 @@ async def chat(request: Request):
             conn.close()
 
             from collections import defaultdict
-            by_rc = defaultdict(dict)            # {(region, crime): {year: count}}
-            by_region_year = defaultdict(int)    # {(region, year): total}
-            by_crime_year = defaultdict(int)     # {(crime, year): total}
-            by_year = defaultdict(int)           # {year: total}
+            by_rc = defaultdict(dict)            
+            by_region_year = defaultdict(int)    
+            by_crime_year = defaultdict(int)     
+            by_year = defaultdict(int)         
             regions, crimes, years = set(), set(), set()
             for region, crime, year, count in rows:
                 by_rc[(region, crime)][year] = count
                 regions.add(region)
                 crimes.add(crime)
                 years.add(year)
-                # "O'zbekiston Respublikasi" allaqachon agregat — ikki marta qo'shmaymiz
                 if region != "O'zbekiston Respublikasi":
                     by_region_year[(region, year)] += count
                     by_crime_year[(crime, year)] += count
@@ -220,7 +218,6 @@ async def chat(request: Request):
 
             parts = []
 
-            # 1) To'liq xom statistika — har bir hudud × jinoyat turi × yil
             parts.append("==== TO'LIQ XOM STATISTIKA (har bir hudud / jinoyat turi / yil) ====")
             parts.append("Format: Hudud | Jinoyat turi | " + " | ".join(years_sorted))
             for region in regions_sorted:
@@ -231,12 +228,10 @@ async def chat(request: Request):
                     vals = " | ".join(str(yc.get(y, '-')) for y in years_sorted)
                     parts.append(f"{region} | {crime} | {vals}")
 
-            # 2) Mamlakat bo'ylab yillik jami (O'zR agregati chiqarilmagan)
             parts.append("\n==== MAMLAKAT BO'YICHA YILLIK JAMI (viloyatlar yig'indisi) ====")
             for y in years_sorted:
                 parts.append(f"  {y}: {by_year[y]} ta")
 
-            # 3) Hudud reytingi — har bir yil bo'yicha
             parts.append("\n==== HUDUDLAR REYTINGI (jami jinoyatlar, barcha turlar) ====")
             for y in years_sorted:
                 ranked = sorted(
@@ -247,7 +242,6 @@ async def chat(request: Request):
                 for i, (r, n) in enumerate(ranked, 1):
                     parts.append(f"    {i}. {r}: {n} ta")
 
-            # 4) Jinoyat turlari bo'yicha yillik dinamika va 2021->2025 o'sishi
             parts.append("\n==== JINOYAT TURLARI BO'YICHA YILLIK DINAMIKA (mamlakat bo'yicha) ====")
             for crime in crimes_sorted:
                 yearly_vals = [(y, by_crime_year[(crime, y)]) for y in years_sorted]
@@ -259,8 +253,6 @@ async def chat(request: Request):
                         growth = (last - first) / first * 100
                         line += f"  ({years_sorted[0]}->{years_sorted[-1]}: {growth:+.1f}%)"
                 parts.append(line)
-
-            # 5) 2026 bashoratlari — to'liq ro'yxat
             try:
                 with open(config.PREDICTIONS_PATH_STR, 'r', encoding='utf-8') as f:
                     preds = json.load(f).get('predictions', [])
@@ -276,7 +268,6 @@ async def chat(request: Request):
             except Exception as e:
                 print("Predictions load error:", e)
 
-            # 6) UI tanlovi bo'yicha qisqa fokus blok
             if sel_region or sel_crime:
                 parts.append("\n==== JORIY UI TANLOVI BO'YICHA FOKUS ====")
                 if sel_region and sel_crime:

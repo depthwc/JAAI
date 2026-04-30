@@ -338,7 +338,7 @@ def run_predictions(db_path, api_key, output_file=None):
 
     output_text = output_text.strip()
 
-    # 5. Save JSON
+
     try:
         parsed_json = json.loads(output_text)
         with open(output_file, 'w', encoding='utf-8') as f:
