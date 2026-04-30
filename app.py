@@ -17,13 +17,13 @@ app = FastAPI()
 
 is_updating = False
 last_modified_times = {}
-# Yo'llar config dan olinadi (loyiha papkasiga nisbatan dinamik)
+
 CLEAN_DIR = config.CLEAN_DIR_STR
 DB_PATH = config.DB_PATH_STR
 
-# Temporary in-memory conversation history: { session_id: [messages] }
+
 conversation_history: dict = {}
-MAX_HISTORY = 20  # har session uchun max xabar soni
+MAX_HISTORY = 20  
 
 async def monitor_clean_data():
     global is_updating
@@ -66,13 +66,13 @@ async def monitor_clean_data():
 @app.on_event("startup")
 async def startup_event():
     global is_updating
-    # Initialize modified times
+
     if os.path.exists(CLEAN_DIR):
         for f in os.listdir(CLEAN_DIR):
             if f.endswith('.xlsx'):
                 last_modified_times[f] = os.path.getmtime(os.path.join(CLEAN_DIR, f))
 
-    # --- DB mavjud emas yoki bo'sh bo'lsa -birinchi marta pipeline ishga tushirish ---
+
     predictions_path = config.PREDICTIONS_PATH_STR
     backup_path = config.PREDICTIONS_BACKUP_PATH_STR
     db_missing = not os.path.exists(DB_PATH)
@@ -108,36 +108,35 @@ async def startup_event():
 
     asyncio.create_task(monitor_clean_data())
 
-# Mount static folder
+
 os.makedirs(config.STATIC_DIR_STR, exist_ok=True)
 app.mount("/static", StaticFiles(directory=config.STATIC_DIR_STR), name="static")
 
-# === LLM API kalitini config orqali yuklash ===
+
 api_key = config.load_api_key()
 if not api_key:
     print("[!] OGOHLANTIRISH: .env fayldan API kalit topilmadi. LLM chaqiruvlari ishlamaydi.")
 
 @app.get("/api/data")
 async def get_data():
-    # 1. Load historical data
     conn = sqlite3.connect(DB_PATH)
     df = pd.read_sql('SELECT * FROM jinoyatlar_statistikasi', conn)
     conn.close()
 
-    # Format historical
+
     history_dict = {}
     for (region, crime_type), group in df.groupby(['Hudud_lotin', 'Jinoyat_turi']):
         key = f"{region}_{crime_type}"
         history_dict[key] = {row['Yil']: row['Jinoyatlar_soni'] for _, row in group.iterrows()}
 
-    # 2. Load predictions
+
     predictions_path = config.PREDICTIONS_PATH_STR
     if not os.path.exists(predictions_path):
         return JSONResponse(content={"error": "Predictions fayli hali yaratilmagan. Biroz kutib qaytadan urinib ko'ring."}, status_code=503)
     with open(predictions_path, 'r', encoding='utf-8') as f:
         predictions = json.load(f)['predictions']
         
-    # 3. Merge
+
     merged_data = []
     for p in predictions:
         key = f"{p['region']}_{p['crime_type']}"
@@ -162,14 +161,14 @@ async def chat(request: Request):
     ui_context = body.get('context', {})
     session_id = body.get('session_id', 'default')
 
-    # --- Memory: suhbat tarixini yuklash ---
+
     if session_id not in conversation_history:
         conversation_history[session_id] = []
     history = conversation_history[session_id]
 
     loop = asyncio.get_running_loop()
 
-    # 1. Web search — sinxron DDGS, event loopni bloklamasligi uchun executorda
+
     def do_web_search():
         try:
             with DDGS() as ddgs:
@@ -184,7 +183,6 @@ async def chat(request: Request):
 
     web_context = await loop.run_in_executor(None, do_web_search)
 
-    # 2. DB ma'lumotlari — agentga jonli statistikani uzatamiz
     def fetch_db_context():
         try:
             conn = sqlite3.connect(DB_PATH)
@@ -193,7 +191,7 @@ async def chat(request: Request):
             sel_crime = ui_context.get('crime_type') if ui_context.get('crime_type') and ui_context.get('crime_type') != 'All' else None
 
             parts = []
-            # 2025-yil eng yuqori 5 hudud
+
             top5 = cur.execute("""
                 SELECT Hudud_lotin, Jami_2025, Reyting FROM region_rankings_2025 LIMIT 5
             """).fetchall()
@@ -201,13 +199,12 @@ async def chat(request: Request):
             for r, n, rk in top5:
                 parts.append(f"  {rk}. {r}: {n} ta")
 
-            # Jinoyat turlari bo'yicha 2021->2025 o'sish
+
             growth = cur.execute("SELECT Jinoyat_turi, Y2021, Y2025, Osish_foizi FROM crime_type_growth ORDER BY Osish_foizi DESC").fetchall()
             parts.append("\nJinoyat turlari bo'yicha 2021-2025 yillik o'sish:")
             for ct, y21, y25, gr in growth:
                 parts.append(f"  - {ct}: 2021-y. {y21} -> 2025-y. {y25} ({gr:+.1f}%)")
 
-            # Yillik umumiy
             yearly = cur.execute("""
                 SELECT Yil, SUM(Jami_jinoyatlar) FROM region_yearly_totals GROUP BY Yil ORDER BY Yil
             """).fetchall()
@@ -215,7 +212,6 @@ async def chat(request: Request):
             for y, n in yearly:
                 parts.append(f"  - {y}: {n} ta")
 
-            # Tanlangan hudud bo'yicha batafsil
             if sel_region:
                 rows = cur.execute("""
                     SELECT Yil, Jami_jinoyatlar FROM region_yearly_totals
@@ -244,7 +240,6 @@ async def chat(request: Request):
 
     db_context = await loop.run_in_executor(None, fetch_db_context)
 
-    # 3. System prompt -config dan keladi (boshqa tilga/uslubga o'tish uchun config.py ni tahrirlang)
     system_prompt = config.build_chat_system_prompt(
         region=ui_context.get('region', ''),
         crime_type=ui_context.get('crime_type', ''),
@@ -252,7 +247,6 @@ async def chat(request: Request):
         web_context=web_context,
     )
 
-    # 4. Build messages with history
     messages = [{"role": "system", "content": system_prompt}]
     messages.extend(history)
     messages.append({"role": "user", "content": user_message})
@@ -312,7 +306,6 @@ async def chat(request: Request):
                                 break
                             loop.call_soon_threadsafe(queue.put_nowait, ('sse', data))
                     else:
-                        # API stream=True ni qo'llab-quvvatlamadi — to'liq JSON keldi
                         full = r.content.decode('utf-8', errors='replace')
                         try:
                             text = json.loads(full)['choices'][0]['message']['content']
@@ -330,7 +323,6 @@ async def chat(request: Request):
 
         loop.run_in_executor(None, producer)
 
-        # Proxy/browser bufferini darhol ochish uchun SSE comment yuboramiz
         yield ": stream-open\n\n"
 
         try:
@@ -356,7 +348,6 @@ async def chat(request: Request):
                     except (json.JSONDecodeError, KeyError, IndexError, TypeError):
                         continue
                 elif kind == 'full':
-                    # Fallback: word-by-word fake stream
                     words = data.split(' ')
                     for i, word in enumerate(words):
                         token = word if i == 0 else ' ' + word
@@ -364,7 +355,6 @@ async def chat(request: Request):
                         yield f"data: {json.dumps({'token': token})}\n\n"
                         await asyncio.sleep(0.02)
 
-            # --- Memory: faqat muvaffaqiyatli javob bo'lsa tarixga qo'shamiz ---
             full_reply = ''.join(full_reply_parts)
             if full_reply:
                 history.append({"role": "user", "content": user_message})
@@ -398,7 +388,6 @@ async def clear_history(session_id: str):
 
 
 
-# Serve index.html at root
 from fastapi.responses import FileResponse
 @app.get("/")
 async def read_index():
